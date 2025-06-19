@@ -129,7 +129,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Carrega chave OpenAI do .env
-load_dotenv(r'C:\python_testes\data-profiling\.env')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Funções auxiliares
