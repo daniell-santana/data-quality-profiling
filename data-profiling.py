@@ -128,7 +128,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Carrega chave OpenAI do .env
-OPENAI_API_KEY = st.secrets("OPENAI_API_KEY")
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 
 # Funções auxiliares
 def detectar_encoding(arquivo):
