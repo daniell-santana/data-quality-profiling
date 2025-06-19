@@ -8,6 +8,8 @@ from ydata_profiling import ProfileReport
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import tempfile
+import base64
 
 
 def duckdb_profiling(df, file_extension):
@@ -83,6 +85,48 @@ def plot_column_stats(col_stats):
 # Configuração inicial
 st.set_page_config(page_title="Profiling de Dados IA", layout="wide")
 st.title("📊 Agente de Profiling de Dados")
+st.markdown("""
+<span style="font-size: 16px; color: #555;">
+    Ferramenta inteligente para análise automática da qualidade dos seus dados. Detecte
+    problemas, padrões e anomalias, receba recomendações e compreenda suas bases de forma prática, visual e intuitiva.
+</span>
+""", unsafe_allow_html=True)
+
+# CSS GLOBAL
+st.markdown("""
+<style>
+    /* Importa fonte do Font Awesome */
+    @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+            
+    /* Fundo branco */
+    .stApp {
+        background-color: white;
+    }
+            
+    /* Barras de progresso mais largas e azuis */
+    .stProgress > div > div > div {
+        background-color: #f1eef6 !important;
+        height: 16px !important;
+    }
+            
+    /* Texto geral */
+    .stApp, .st-bb, .st-at, .st-ae, .st-af, .st-ag, .stMarkdown, .stAlert, 
+    .stProgress, .stMetric, .st-expander, .stTextInput, .stNumberInput,
+    .stSelectbox, .stSlider, .stDataFrame, .stTable {
+        color: black !important;
+    }
+    
+    /* Títulos */
+    h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        color: black !important;
+    }
+    
+    /* Links */
+    a {
+        color: #1f77b4 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Carrega chave OpenAI do .env
 load_dotenv(r'C:\python_testes\data-profiling\.env')
@@ -348,15 +392,26 @@ if uploaded_file:
             range_r=[0, 5],
             title="Score de Qualidade da Base (1-5)"
         )
-        fig.update_traces(fill='toself')
+        fig.update_traces(fill='toself', line_color='#4591b8',fillcolor='rgba(69, 145, 184, 0.5)')
         fig.update_layout(
             polar=dict(
+                bgcolor='white',
                 radialaxis=dict(
                     visible=True,
                     range=[0, 5],
-                    tickvals=[1, 2, 3, 4, 5]
-                )),
-            showlegend=False
+                    tickvals=[1, 2, 3, 4, 5],
+                    color='black',
+                    tickfont=dict(color='black')
+                )
+            ),
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            font=dict(color='black'),
+            title_font=dict(color='black'),
+            showlegend=False,
+            height=400,
+            # Movemos as margens para o layout principal
+            margin=dict(t=30, b=30, l=30, r=30)
         )
         st.plotly_chart(fig, use_container_width=True)
     
@@ -364,16 +419,79 @@ if uploaded_file:
     with col1:
         st.subheader(f"Score Total: {score_final}/5")
         st.metric("Classificação", "⭐" * int(score_final))
+        
         st.write("### Critérios:")
+        
+        # CSS para tooltip com ícone
+        st.markdown("""
+        <style>
+        /* Tooltip com FontAwesome */
+        .criteria-tooltip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 5px;
+        }
+        .criteria-tooltip .icon {
+            color: #4591b8;
+            font-size: 14px;
+        }
+        .criteria-tooltip .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background-color: #2c3e50;
+            color: white;
+            text-align: center;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .criteria-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* Ajuste para não conflitar com seu progress bar */
+        .stProgress {
+            margin-top: -12px !important;
+            margin-bottom: 8px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        descricoes_criterios = {
+            "Completude": "Proporção de valores preenchidos (não nulos)",
+            "Unicidade": "Presença de registros duplicados",
+            "Consistência": "Valores batem com o tipo declarado",
+            "Precisão": "Detecção de outliers numéricos",
+            "Integridade": "Formato e semântica (CPF, datas, etc.)"
+        }
+        
         for criterio, valor in scores.items():
-            st.progress(valor/5, text=f"{criterio}: {valor}/5")
-    
+            st.markdown(f"""
+            <div class="criteria-tooltip">
+                {criterio}: {valor}/5
+                <span class="icon"><i class="fas fa-info-circle"></i></span>
+                <span class="tooltip-text">{descricoes_criterios[criterio]}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            st.progress(valor/5)
+
     with col2:
+        st.write('<div style="margin-top:-20px;"></div>', unsafe_allow_html=True)  # Ajuste fino
         plot_radar_chart(scores)
 
     # Seção 2: Análise da IA
     if OPENAI_API_KEY:
-        st.header("🧠 Análise Detalhada por IA")
+        st.header("🧠 Análise e Recomendações da IA")
         client = OpenAI(api_key=OPENAI_API_KEY)
         
         prompt = f"""
@@ -392,7 +510,7 @@ if uploaded_file:
 
         🚨 **REGRAS OBRIGATÓRIAS – LEIA CUIDADOSAMENTE ANTES DE RESPONDER:**
 
-        - ❌ **NÃO** analise critérios com score **maior que 3**  
+        - ❌ **NUNCA** analise critérios com score **maior que 3** 
         - ✅ **SÓ** analise critérios com **score 3, 2 ou 1**
 
         🛑 Se um critério tiver score **4 ou 5**, **NÃO escreva nada sobre ele**
@@ -403,6 +521,9 @@ if uploaded_file:
 
         **Scores de qualidade (1-5) para esta base:**  
         {scores}
+
+        **Critérios que PODEM ser analisados (score ≤3):**  
+        { {k: v for k, v in scores.items() if v <= 3} }
 
         **Diagnóstico por Critério (colunas com problemas detectados):**  
         {diagnostico_colunas}
@@ -543,7 +664,8 @@ if uploaded_file:
                         border-radius: 10px;
                         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                         margin-bottom: 20px;
-                        background: white;
+                        background: #dbebfa;  /* COR ALTERADA */
+                        opacity: 0.7;        /* TRANSPARÊNCIA ADICIONADA */
                         height: 500px;
                         overflow-y: auto;
                         color: black !important;
@@ -553,7 +675,7 @@ if uploaded_file:
                         font-weight: bold;
                         margin-bottom: 15px;
                         color: #2c3e50;
-                        border-bottom: 2px solid #eee;
+                        border-bottom: 2px solid #0d0c0c;
                         padding-bottom: 8px;
                     }
                 </style>
@@ -614,19 +736,56 @@ if uploaded_file:
         st.components.v1.html(profile.to_html(), height=800, scrolling=True)
         
         # Botão de download
-        with st.expander("💾 Opções de Download"):
-            st.download_button(
-                label="Baixar Relatório (HTML)",
-                data=profile.to_html(),
-                file_name="data_profile.html",
-                mime="text/html"
-            )
-            st.download_button(
-                label="Baixar Dados (CSV)",
-                data=df.to_csv(index=False),
-                file_name="dados_analisados.csv",
-                mime="text/csv"
-            )
+        with st.expander("💾 Opções de Download", expanded=False):
+            # CSS para botões lado a lado
+            st.markdown("""
+            <style>
+            .download-row {
+                display: flex;
+                gap: 10px;
+                margin-top: 10px;
+            }
+            .download-btn {
+                flex: 1;
+                background-color: white !important;
+                border: 1px solid #008fcf !important;
+                color: #008fcf !important;
+                border-radius: 4px;
+                padding: 8px;
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .download-btn:hover {
+                background-color: #f0f8ff !important;
+            }
+            /* Remove os botões padrão do Streamlit */
+            .stDownloadButton { display: none !important; }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Criar arquivo temporário para o relatório
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
+                profile.to_file(tmp.name)
+                html_content = open(tmp.name, "rb").read()
+            
+            # Criar arquivo temporário para os dados
+            csv_content = df.to_csv(index=False).encode('utf-8')
+            
+            # Layout dos botões - ÚNICA implementação necessária
+            st.markdown("""
+            <div class="download-row">
+                <a href="data:text/html;base64,{b64_html}" download="profile_report.html" class="download-btn">
+                    📥 Relatório (HTML)
+                </a>
+                <a href="data:text/csv;base64,{b64_csv}" download="dados_analisados.csv" class="download-btn">
+                    📊 Dados (CSV)
+                </a>
+            </div>
+            """.format(
+                b64_html=base64.b64encode(html_content).decode(),
+                b64_csv=base64.b64encode(csv_content).decode()
+            ), unsafe_allow_html=True)
 
     # Seção 4: Recomendações Técnicas
     st.header("🛠️ Recomendações para Qualidade de Dados")
@@ -788,4 +947,4 @@ if uploaded_file:
 
     # Rodapé
     st.markdown("---")
-    st.caption("Desenvolvido com Streamlit, ydata-profiling e OpenAI API • [Como contribuir?](https://github.com)")
+    st.caption("Desenvolvido com Streamlit, ydata-profiling e OpenAI API • [Como contribuir?](https://github.com/daniell-santana/data-quality-profiling)")
