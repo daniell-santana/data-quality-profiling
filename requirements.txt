@@ -6,3 +6,4 @@ openai
 ydata-profiling==4.16.1 
 pandas
 numpy
+setuptools
