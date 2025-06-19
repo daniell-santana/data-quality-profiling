@@ -6,7 +6,6 @@ import chardet
 import duckdb
 from ydata_profiling import ProfileReport
 from openai import OpenAI
-from dotenv import load_dotenv
 import os
 import tempfile
 import base64
@@ -129,7 +128,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Carrega chave OpenAI do .env
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = st.secrets("OPENAI_API_KEY")
 
 # Funções auxiliares
 def detectar_encoding(arquivo):
