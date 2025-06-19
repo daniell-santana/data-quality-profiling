@@ -5,7 +5,7 @@
 [![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 
 ## 🎯 Objetivo
-Ferramenta completa para análise automática de qualidade de dados que combina:
+Ferramenta para análise automática de qualidade de dados que combina:
 - **Data Profiling** tradicional
 - **Avaliação de critérios de qualidade** (com scores 1-5)
 - **Diagnóstico por IA** (LLM) com recomendações acionáveis
@@ -13,8 +13,8 @@ Ferramenta completa para análise automática de qualidade de dados que combina:
 
 **Diferencial**:
 - Explicações técnicas contextualizadas
+- Detecção de anomalias
 - Sugestões de correção especídficas e indicação de ações preventivas e corretivas
-- Análise de compatibilidade entre tipos e conteúdo real
 
 ---
 
