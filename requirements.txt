@@ -3,6 +3,6 @@ plotly
 chardet
 duckdb
 openai
-ydata-profiling==4.6.1  # ou superior
+ydata-profiling==4.16.1 
 pandas==2.0.3
 numpy==1.24.3
