@@ -1,6 +1,6 @@
 # 📊 Data Profiling com IA - Análise Automática de Qualidade de Dados
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)]([https://streamlit.io/](https://data-quality-profiling-fmusyk6aoprwzclscnunjw.streamlit.app/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://data-quality-profiling-fmusyk6aoprwzclscnunjw.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 [![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 
