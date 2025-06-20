@@ -168,10 +168,17 @@ def calcular_scores(df):
         }
     # 1. COMPLETUDE - Verifica valores não nulos
     null_pct = df.isnull().mean()
-    col_completude_ruim = null_pct[null_pct > 0.3].index.tolist()
-    completude_score = (1 - null_pct.mean()) * 100
-    scores["Completude"] = max(1, round(completude_score / 20))
-    diagnostico_colunas["Completude"] = col_completude_ruim
+    col_completude_ruim = null_pct[null_pct > 0.1]
+    if not col_completude_ruim.empty:
+        # Guardar nomes das colunas com problema
+        diagnostico_colunas["Completude"] = list(col_completude_ruim.index)
+        
+        severidade_media = col_completude_ruim.mean()  # quanto em média falta nas colunas problemáticas
+        score_bruto = 1 - severidade_media
+        scores["Completude"] = max(1, round(score_bruto * 4))  # penaliza mais que o padrão
+    else:
+        scores["Completude"] = 5
+
 
     # 2. UNICIDADE - Verifica registros duplicados
     if df.duplicated().mean() > 0.2:
@@ -181,6 +188,7 @@ def calcular_scores(df):
 
     # 3. CONSISTÊNCIA - Garante que o conteúdo bate com o dtype declarado da coluna
     colunas_inconsistentes = []
+    peso_erros = []
 
     for col in df.columns:
         serie = df[col].dropna()
@@ -190,30 +198,44 @@ def calcular_scores(df):
         tipo = df[col].dtype
         valores = serie.astype(str).str.strip()
 
-        # Define critérios de consistência com base no tipo declarado
         if pd.api.types.is_numeric_dtype(tipo):
-            # Esperado: valores realmente numéricos
-            valores_invalidos = valores[~valores.str.match(r'^-?\d+([.,]\d+)?$', na=False)]
-            if len(valores_invalidos) / len(valores) > 0.1:
+            valores_invalidos = valores[~valores.str.replace('.', '', regex=False).str.replace(',', '.', regex=False).str.match(r'^-?\d+(\.\d+)?$', na=False)]
+            erro_pct = len(valores_invalidos) / len(valores)
+            if erro_pct > 0.1:
                 colunas_inconsistentes.append(col)
+                peso_erros.append(min(erro_pct, 1))
 
         elif pd.api.types.is_datetime64_any_dtype(tipo):
-            # Esperado: valores com padrão de data
             date_pattern = r'^\d{2}[/-]\d{2}[/-]\d{4}$|^\d{4}[/-]\d{2}[/-]\d{2}$'
             valores_invalidos = valores[~valores.str.match(date_pattern, na=False)]
-            if len(valores_invalidos) / len(valores) > 0.1:
+            erro_pct = len(valores_invalidos) / len(valores)
+            if erro_pct > 0.1:
                 colunas_inconsistentes.append(col)
+                peso_erros.append(min(erro_pct, 1))
 
         elif pd.api.types.is_object_dtype(tipo):
-            # Esperado: conteúdo não parecendo número nem data (ex: "João", "SP", etc.)
             numeros_detectados = valores.str.match(r'^-?\d+([.,]\d+)?$', na=False)
             datas_detectadas = valores.str.match(r'^\d{2}[/-]\d{2}[/-]\d{4}$|^\d{4}[/-]\d{2}[/-]\d{2}$', na=False)
+
+            # Se a maior parte dos valores parecer número ou data, mas o tipo é texto => problema
             if (numeros_detectados.mean() > 0.5) or (datas_detectadas.mean() > 0.5):
                 colunas_inconsistentes.append(col)
+                peso_erros.append(1)
 
-    tipo_correto_pct = 1 - (len(colunas_inconsistentes) / len(df.columns))
-    scores["Consistência"] = max(1, round(tipo_correto_pct * 5))
+            # 🚨 Nova verificação: coluna parece conter datas, mas não está tipada como datetime
+            if datas_detectadas.mean() > 0.5:
+                colunas_inconsistentes.append(col)
+                peso_erros.append(1)  # 100% inconsistente para tipo errado
+
+    # Novo score com peso
+    if peso_erros:
+        score_raw = 1 - (sum(peso_erros) / len(df.columns))
+        scores["Consistência"] = max(1, round(score_raw * 4))  # mais agressivo
+    else:
+        scores["Consistência"] = 5
+
     diagnostico_colunas["Consistência"] = colunas_inconsistentes
+
 
     # 4. PRECISÃO - Detecta outliers em colunas numéricas
     outlier_cols = []
@@ -237,6 +259,8 @@ def calcular_scores(df):
     integridade_score = 0
     total_checks = 0
     integridade_detalhes = []
+    colunas_semantica_grave = 0  # conta colunas com problemas semânticos sérios
+    penalidade_capitalizacao_severa = 0  # penalização direta extra
 
     for col in df.columns:
         col_checks = 0
@@ -248,15 +272,13 @@ def calcular_scores(df):
 
         # COLUNAS NUMÉRICAS
         if pd.api.types.is_numeric_dtype(serie):
-            # Check 1: Negativos em campos que deveriam ser positivos
-            if any(k in col_lower for k in ['valor', 'preço', 'quantidade', 'saldo']):
+            if any(k in col_lower for k in ['valor', 'preço', 'quantidade', 'saldo', 'total']):
                 if serie.min() < 0:
                     col_problemas.append("valores negativos indevidos")
                 else:
                     col_passes += 1
                 col_checks += 1
 
-            # Check 2: Variáveis binárias
             if 'binário' in col_lower or 'flag' in col_lower:
                 valores = set(serie.dropna().unique())
                 if not valores.issubset({0, 1}):
@@ -269,12 +291,32 @@ def calcular_scores(df):
         elif pd.api.types.is_object_dtype(serie):
             sample = serie.dropna().astype(str).sample(min(100, len(serie.dropna())), random_state=42)
 
-            # Check 3: Capitalização
-            if sample.str.islower().any() or sample.str.isupper().any():
-                col_problemas.append("capitalização inconsistente")
+            # Check 3: Capitalização inconsistente
+            if not any(k in col_lower for k in ['email', 'site', 'url', 'website']):
+                def tipo_cap(x):
+                    if x.istitle():
+                        return 'title'
+                    elif x.islower():
+                        return 'lower'
+                    elif x.isupper():
+                        return 'upper'
+                    else:
+                        return 'mixed'
+
+                capitalization_variants = sample.apply(tipo_cap)
+
+                if capitalization_variants.nunique() > 2:
+                    col_problemas.append("capitalização severamente inconsistente")
+                    colunas_semantica_grave += 1
+                    penalidade_capitalizacao_severa = 2  # Aplica penalização extra de 2 pontos
+                elif capitalization_variants.nunique() > 1:
+                    col_problemas.append("capitalização inconsistente")
+                else:
+                    col_passes += 1
+                col_checks += 1
             else:
                 col_passes += 1
-            col_checks += 1
+                col_checks += 1
 
             # Check 4: Códigos e documentos
             if any(k in col_lower for k in ['cpf', 'cnpj', 'telefone', 'cep', 'id', 'cod', 'cd']):
@@ -310,6 +352,14 @@ def calcular_scores(df):
                     col_passes += 1
                 col_checks += 1
 
+            # Check 6: Tipos mistos em colunas object
+            tipos_observados = serie.dropna().apply(lambda x: type(x).__name__).value_counts()
+            if len(tipos_observados) > 1:
+                col_problemas.append("tipos mistos na coluna")
+            else:
+                col_passes += 1
+            col_checks += 1
+
         # COLUNAS DATETIME
         elif pd.api.types.is_datetime64_any_dtype(serie):
             col_passes += 1
@@ -317,14 +367,26 @@ def calcular_scores(df):
 
         # Soma pontuação
         if col_checks > 0:
-            integridade_score += (col_passes / col_checks)
+            if len(col_problemas) >= 2:
+                integridade_score += 0  # Falhou muito
+            else:
+                integridade_score += (col_passes / col_checks)
             total_checks += 1
+
             if col_problemas:
                 integridade_detalhes.append(f"{col}: {', '.join(col_problemas)}")
 
-    scores["Integridade"] = max(1, round((integridade_score / total_checks) * 5)) if total_checks else 5
-    diagnostico_colunas["Integridade"] = integridade_detalhes
+    # Penalização final com base na gravidade
+    colunas_com_problemas = len(integridade_detalhes)
+    total_colunas = len(df.columns)
+    penalidade_geral = colunas_com_problemas / total_colunas if total_colunas > 0 else 0
+    penalidade_semantica = min(1, colunas_semantica_grave / 3)
 
+    score_final = (integridade_score / total_checks) * 5 if total_checks else 5
+    score_ajustado = score_final - (2 * penalidade_geral) - penalidade_semantica - penalidade_capitalizacao_severa  # até 4 pontos de perda
+
+    scores["Integridade"] = max(1, round(score_ajustado))
+    diagnostico_colunas["Integridade"] = integridade_detalhes
     return scores, diagnostico_colunas
 
 # Upload de dados
