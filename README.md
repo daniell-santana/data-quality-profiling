@@ -74,8 +74,51 @@ Com base nos **scores calculados**, a IA (via API da OpenAI) gera um **diagnóst
 ## 🔄 Fluxo de Interação
 
 ```mermaid
-graph TD
-    A[Upload de Arquivo] --> B[Análise de Qualidade]
-    B --> C[Diagnóstico por IA]
-    C --> D[Relatório Completo]
-    D --> E[Download dos Resultados]
+flowchart TD
+    A[Upload de Dados] --> B{Formato do Arquivo?}
+    B -->|CSV| C[Detectar Encoding/Separador]
+    B -->|Excel/Parquet/JSON| D[Carregamento Direto]
+    C --> E[DataFrame Pandas]
+    D --> E
+    
+    E --> F[Análise de Metadados]
+    F --> G["Critérios de Qualidade (Camada 1)"]
+    G --> H["Completude (Valores Nulos)"]
+    G --> I["Unicidade (Duplicatas)"]
+    G --> J["Consistência (Tipos de Dados)"]
+    
+    E --> K["Critérios de Qualidade (Camada 2)"]
+    K --> L["Integridade (CPF/CNPJ/Datas)"]
+    K --> M["Precisão (Outliers Numéricos)"]
+    K --> N["Valores Semânticos (Idade Negativa, Binários)"]
+    
+    H --> O[Score 1-5]
+    I --> O
+    J --> O
+    L --> O
+    M --> O
+    N --> O
+    
+    O --> P{Algum Score ≤ 3?}
+    P -->|Sim| Q[Acionar Análise de IA]
+    P -->|Não| R[Relatório Padrão]
+    
+    Q --> S["GPT-4: Diagnóstico Específico"]
+    S --> T["Recomendações Técnicas"]
+    T --> U["Sugestões de Mitigação"]
+    
+    R --> V[Relatório Interativo]
+    U --> V
+    
+    V --> W["Visualizações:"]
+    W --> X["Radar de Scores"]
+    W --> Y["Tabela de Problemas"]
+    W --> Z["Amostras de Dados"]
+    
+    V --> AA[Exportação]
+    AA --> AB[HTML: Relatório Completo]
+    AA --> AC[CSV: Dados Brutos]
+    
+    AA --> AD[Feedback Loop]
+    AD --> AE[Atualizar Regras]
+    AE --> G
