@@ -75,50 +75,63 @@ Com base nos **scores calculados**, a IA (via API da OpenAI) gera um **diagnóst
 
 ```mermaid
 flowchart TD
-    A[Upload de Dados] --> B{Formato do Arquivo?}
-    B -->|CSV| C[Detectar Encoding/Separador]
-    B -->|Excel/Parquet/JSON| D[Carregamento Direto]
-    C --> E[DataFrame Pandas]
-    D --> E
+    A[UPLOAD DE DADOS] --> B{FORMATO DO ARQUIVO?}
+    B -->|PARQUET/JSON| C[CARREGAMENTO DIRETO]
+    B -->|CSV/XLSX| D[DETECTAR ENCONDING/SEPARADOR]
     
-    E --> F[Análise de Metadados]
-    F --> G["Critérios de Qualidade (Camada 1)"]
-    G --> H["Completude (Valores Nulos)"]
-    G --> I["Unicidade (Duplicatas)"]
-    G --> J["Consistência (Tipos de Dados)"]
+    D --> E[DATAFRAME PANDAS]
+    C --> E
     
-    E --> K["Critérios de Qualidade (Camada 2)"]
-    K --> L["Integridade (CPF/CNPJ/Datas)"]
-    K --> M["Precisão (Outliers Numéricos)"]
-    K --> N["Valores Semânticos (Idade Negativa, Binários)"]
+    E --> F[REGISTRAR NO DUCKDB]
+    F --> G["CREATE TABLE df AS FROM pandas_df"]
     
-    H --> O[Score 1-5]
-    I --> O
-    J --> O
+    subgraph "🦆 DUCKDB"
+        G --> H[METADADOS ANALYSE]
+    end
+    
+    H --> I[TRANSFORMADO EM MAQUET]
+    
+    subgraph "🔍 CAMADA 1"
+        I --> J[COMITÁRIOS\nvalores não nulos]
+        I --> K[UNICIDADE\nregistros únicos]
+        I --> L[CONSISTÊNCIA\ntipos de dados]
+    end
+    
+    subgraph "🧠 CAMADA 2"
+        I --> M[INTEGRIDADE\nvalores semelhantes e formatos]
+        I --> N[PRECISÃO\noutliers numéricos]
+    end
+    
+    %% Cálculo do Score
+    J --> O[SCORE]
+    K --> O
     L --> O
     M --> O
     N --> O
     
-    O --> P{Algum Score ≤ 3?}
-    P -->|Sim| Q[Acionar Análise de IA]
-    P -->|Não| R[Relatório Padrão]
+    %% Avaliação
+    O --> P{Score ≤ 3?}
+    P -->|Sim| Q[ACIONAR ANÁLISE DE IA]
+    P -->|Não| R[RELATÓRIO PADRÃO]
     
-    Q --> S["GPT-4: Diagnóstico Específico"]
-    S --> T["Recomendações Técnicas"]
-    T --> U["Sugestões de Mitigação"]
+    Q --> S[GPT-4: DIAGNÓSTICO ESPECÍFICO]
+    S --> T[RECOMENDAÇÕES TÉCNICAS]
+    S --> U[SUGESTÕES DE MITIGAÇÃO]
     
-    R --> V[Relatório Interativo]
+    R --> V[RELATÓRIO INTERATIVO]
+    T --> V
     U --> V
     
-    V --> W["Visualizações:"]
-    W --> X["Radar de Scores"]
-    W --> Y["Tabela de Problemas"]
-    W --> Z["Amostras de Dados"]
+    %% Saídas
+    V --> W[VISUALIZAÇÕES]
+    W --> X[RADAR DE SCORES]
+    W --> Y[TABELA DE PROBLEMAS]
+    W --> Z[AMOSTRA DE DADOS]
     
-    V --> AA[Exportação]
-    AA --> AB[HTML: Relatório Completo]
-    AA --> AC[CSV: Dados Brutos]
+    V --> AA[EXPORTAÇÃO]
+    AA --> BB[HTML: RELATÓRIO COMPLETO]
+    AA --> CC[CSV: DADOS BRUTOS]
     
-    AA --> AD[Feedback Loop]
-    AD --> AE[Atualizar Regras]
-    AE --> G
+    AA --> DD[FEEDBACK LOOP]
+    DD --> EE[ATUALIZAR REGRAS]
+    EE --> H
